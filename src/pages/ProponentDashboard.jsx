@@ -1,57 +1,95 @@
+import { useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+
+const seedApplications = [
+  {
+    id: "EC-2023-0842",
+    name: "Solar Farm Expansion Phase II",
+    category: "Renewable Energy",
+    status: "Under Review",
+    date: "Oct 12, 2023",
+    documentLink: "https://drive.google.com/drive/folders/sample-1",
+  },
+  {
+    id: "EC-2023-0711",
+    name: "Wetland Remediation Plan",
+    category: "Conservation",
+    status: "Deficiency",
+    date: "Sep 28, 2023",
+    documentLink: "https://drive.google.com/drive/folders/sample-2",
+    deficiencyMessage:
+      "Deficiency raised by scrutiny team: Missing hydro-geology annexure and signed environmental compliance statement.",
+  },
+  {
+    id: "EC-2023-0659",
+    name: "Industrial Waste Management",
+    category: "Waste Systems",
+    status: "Finalized",
+    date: "Sep 15, 2023",
+    documentLink: "https://drive.google.com/drive/folders/sample-3",
+  },
+  {
+    id: "EC-2023-0544",
+    name: "Urban Greenery Project",
+    category: "Urban Planning",
+    status: "Submitted",
+    date: "Aug 30, 2023",
+    documentLink: "https://drive.google.com/drive/folders/sample-4",
+  },
+  {
+    id: "EC-2023-0422",
+    name: "Coastal Wind Turbine Alpha",
+    category: "Renewable Energy",
+    status: "Draft",
+    date: "Not Submitted",
+    documentLink: "https://drive.google.com/drive/folders/sample-5",
+  },
+];
+
+const sectorCategories = [
+  "Infrastructure Sector",
+  "Industrial Waste Sector",
+  "Renewable Energy Sector",
+];
+
 function ProponentDashboard() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [activeView, setActiveView] = useState("dashboard");
+  const [applications, setApplications] = useState(seedApplications);
+  const [creationMessage, setCreationMessage] = useState("");
+  const [form, setForm] = useState({
+    projectName: "",
+    category: "",
+  });
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [allowMultipleFiles, setAllowMultipleFiles] = useState(true);
+  const [formErrors, setFormErrors] = useState({});
+  const fileInputRef = useRef(null);
+
   const dashboardNavItems = [
-    { label: "Dashboard", icon: <DashboardIcon />, active: true },
-    { label: "New App", icon: <PlusCircleIcon /> },
-    { label: "My Apps", icon: <DocumentIcon /> },
-    { label: "Payments", icon: <PaymentsIcon /> },
-    { label: "Tracking", icon: <PinIcon /> },
+    { key: "dashboard", label: "Dashboard", icon: <DashboardIcon /> },
+    { key: "new-app", label: "New App", icon: <PlusCircleIcon /> },
+    { key: "my-apps", label: "My Apps", icon: <DocumentIcon /> },
+    { key: "payments", label: "Payments", icon: <PaymentsIcon /> },
+    { key: "tracking", label: "Tracking", icon: <PinIcon /> },
   ];
 
-  const dashboardStats = [
-    { label: "Draft", value: "12", tone: "neutral", tag: "Active" },
-    { label: "Submitted", value: "45", tone: "blue", tag: "Pending" },
-    { label: "Under Review", value: "08", tone: "amber", tag: "Reviewing" },
-    { label: "Deficiency", value: "03", tone: "red", tag: "Critical" },
-    { label: "Finalized", value: "29", tone: "green", tag: "Success" },
-  ];
-
-  const dashboardApplications = [
-    {
-      id: "EC-2023-0842",
-      name: "Solar Farm Expansion Phase II",
-      category: "Renewable Energy",
-      status: "Under Review",
-      date: "Oct 12, 2023",
-    },
-    {
-      id: "EC-2023-0711",
-      name: "Wetland Remediation Plan",
-      category: "Conservation",
-      status: "Deficiency",
-      date: "Sep 28, 2023",
-    },
-    {
-      id: "EC-2023-0659",
-      name: "Industrial Waste Management",
-      category: "Waste Systems",
-      status: "Finalized",
-      date: "Sep 15, 2023",
-    },
-    {
-      id: "EC-2023-0544",
-      name: "Urban Greenery Project",
-      category: "Urban Planning",
-      status: "Submitted",
-      date: "Aug 30, 2023",
-    },
-    {
-      id: "EC-2023-0422",
-      name: "Coastal Wind Turbine Alpha",
-      category: "Renewable Energy",
-      status: "Draft",
-      date: "Not Submitted",
-    },
-  ];
+  const dashboardStats = useMemo(() => {
+    const count = (status) => applications.filter((item) => item.status === status).length;
+    return [
+      { label: "Draft", value: formatCount(count("Draft")), tone: "neutral", tag: "Active" },
+      { label: "Submitted", value: formatCount(count("Submitted")), tone: "blue", tag: "Pending" },
+      {
+        label: "Under Review",
+        value: formatCount(count("Under Review")),
+        tone: "amber",
+        tag: "Reviewing",
+      },
+      { label: "Deficiency", value: formatCount(count("Deficiency")), tone: "red", tag: "Critical" },
+      { label: "Finalized", value: formatCount(count("Finalized")), tone: "green", tag: "Success" },
+    ];
+  }, [applications]);
 
   const trendBars = [
     { label: "Mar", height: "40%" },
@@ -63,6 +101,109 @@ function ProponentDashboard() {
     { label: "Sep", height: "50%" },
     { label: "Oct", height: "75%" },
   ];
+
+  const recentApplications = applications.slice(0, 5);
+  const workflowApplicationId = useMemo(
+    () => new URLSearchParams(location.search).get("workflow"),
+    [location.search],
+  );
+  const workflowApplication = useMemo(
+    () =>
+      applications.find((application) => application.id === workflowApplicationId) ?? null,
+    [applications, workflowApplicationId],
+  );
+
+  const selectView = (view) => {
+    setActiveView(view);
+    if (view !== "my-apps") setCreationMessage("");
+  };
+
+  const openWorkflowWindow = (applicationId) => {
+    window.open(
+      `/proponent-dashboard?workflow=${encodeURIComponent(applicationId)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
+
+  const handleFormChange = (field) => (event) => {
+    const value = event.target.value;
+    setForm((current) => ({ ...current, [field]: value }));
+    setFormErrors((current) => ({ ...current, [field]: "" }));
+  };
+
+  const handleCreateApplication = (event) => {
+    event.preventDefault();
+
+    const nextErrors = {};
+    if (!form.projectName.trim()) nextErrors.projectName = "Project name is required.";
+    if (!form.category.trim()) nextErrors.category = "Category is required.";
+    if (selectedFiles.length === 0) {
+      nextErrors.documents = "At least one PDF file is required.";
+    } else if (!selectedFiles.every((file) => isPdfFile(file))) {
+      nextErrors.documents = "Only PDF files are allowed.";
+    }
+
+    setFormErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    const newApplication = {
+      id: `TEMP-${String(applications.length + 1).padStart(4, "0")}`,
+      name: form.projectName.trim(),
+      category: form.category.trim(),
+      status: "Submitted",
+      date: toDisplayDate(new Date()),
+      documentNames: selectedFiles.map((file) => file.name),
+      documentCount: selectedFiles.length,
+    };
+
+    setApplications((current) => [newApplication, ...current]);
+    setForm({ projectName: "", category: "" });
+    setSelectedFiles([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setCreationMessage(
+      "Application created. Application ID is temporary and will be fetched from backend later.",
+    );
+    setActiveView("my-apps");
+  };
+
+  const handleSaveDraft = () => {
+    const draftApplication = {
+      id: `TEMP-${String(applications.length + 1).padStart(4, "0")}`,
+      name: form.projectName.trim() || "Untitled Draft",
+      category: form.category.trim() || "Not Selected",
+      status: "Draft",
+      date: "Not Submitted",
+      documentNames: selectedFiles.map((file) => file.name),
+      documentCount: selectedFiles.length,
+    };
+
+    setApplications((current) => [draftApplication, ...current]);
+    setForm({ projectName: "", category: "" });
+    setSelectedFiles([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setFormErrors({});
+    setCreationMessage(
+      "Draft saved. You can resume and submit this application later.",
+    );
+    setActiveView("my-apps");
+  };
+
+  const handleFileSelection = (event) => {
+    const incomingFiles = Array.from(event.target.files ?? []);
+    const files = allowMultipleFiles ? incomingFiles : incomingFiles.slice(0, 1);
+    setSelectedFiles(files);
+    setFormErrors((current) => ({ ...current, documents: "" }));
+  };
+
+  const handleAllowMultipleToggle = (event) => {
+    const enabled = event.target.checked;
+    setAllowMultipleFiles(enabled);
+    if (!enabled && selectedFiles.length > 1) {
+      setSelectedFiles((current) => current.slice(0, 1));
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   return (
     <div className="dashboard-root">
@@ -77,14 +218,15 @@ function ProponentDashboard() {
 
           <nav className="dashboard-nav" aria-label="Sidebar">
             {dashboardNavItems.map((item) => (
-              <a
-                className={`dashboard-nav-item${item.active ? " is-active" : ""}`}
-                href="#"
-                key={item.label}
+              <button
+                className={`dashboard-nav-item${activeView === item.key ? " is-active" : ""}`}
+                key={item.key}
+                onClick={() => selectView(item.key)}
+                type="button"
               >
                 {item.icon}
                 <span>{item.label}</span>
-              </a>
+              </button>
             ))}
           </nav>
 
@@ -110,10 +252,7 @@ function ProponentDashboard() {
 
             <label className="dashboard-search" aria-label="Search">
               <SearchIcon />
-              <input
-                type="text"
-                placeholder="Search applications, invoices..."
-              />
+              <input placeholder="Search applications, invoices..." type="text" />
             </label>
 
             <div className="dashboard-toolbar">
@@ -125,136 +264,272 @@ function ProponentDashboard() {
                 <SettingsIcon />
               </button>
               <span className="dashboard-divider" />
-              <a className="dashboard-primary-button" href="#new-application">
+              <button
+                className="dashboard-primary-button"
+                onClick={() => selectView("new-app")}
+                type="button"
+              >
                 <PlusIcon />
                 <span>New Application</span>
-              </a>
+              </button>
             </div>
           </header>
 
           <div className="dashboard-content">
-            <section className="dashboard-heading">
-              <div>
-                <h1>Dashboard</h1>
-                <p>
-                  Welcome back. Monitoring your environmental compliance status.
-                </p>
-              </div>
-              <span>Last updated: Oct 24, 2023 at 09:42 AM</span>
-            </section>
+            {workflowApplicationId ? (
+              <WorkflowStagesView
+                application={workflowApplication}
+                onClose={() => navigate("/proponent-dashboard")}
+              />
+            ) : null}
 
-            <section className="dashboard-stats" aria-label="Application stats">
-              {dashboardStats.map((stat) => (
-                <article className="stat-tile" key={stat.label}>
-                  <p>{stat.label}</p>
-                  <div className="stat-tile-row">
-                    <strong className={stat.tone === "red" ? "is-alert" : ""}>
-                      {stat.value}
-                    </strong>
-                    <span className={`status-chip is-${stat.tone}`}>{stat.tag}</span>
+            {!workflowApplicationId && activeView === "dashboard" ? (
+              <>
+                <section className="dashboard-heading">
+                  <div>
+                    <h1>Dashboard</h1>
+                    <p>Welcome back. Monitoring your environmental compliance status.</p>
+                  </div>
+                  <span>Last updated: Oct 24, 2023 at 09:42 AM</span>
+                </section>
+
+                <section className="dashboard-stats" aria-label="Application stats">
+                  {dashboardStats.map((stat) => (
+                    <article className="stat-tile" key={stat.label}>
+                      <p>{stat.label}</p>
+                      <div className="stat-tile-row">
+                        <strong className={stat.tone === "red" ? "is-alert" : ""}>
+                          {stat.value}
+                        </strong>
+                        <span className={`status-chip is-${stat.tone}`}>{stat.tag}</span>
+                      </div>
+                    </article>
+                  ))}
+                </section>
+
+                <section className="dashboard-panel">
+                  <div className="dashboard-panel-header">
+                    <h2>Recent Applications</h2>
+                    <div className="dashboard-panel-actions">
+                      <button className="dashboard-ghost-button" type="button">
+                        <FilterIcon />
+                        <span>Filter</span>
+                      </button>
+                      <button className="dashboard-ghost-button" type="button">
+                        <span>Export</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <ApplicationsTable applications={recentApplications} />
+
+                  <div className="dashboard-panel-footer">
+                    <p>Showing {Math.min(5, applications.length)} of {applications.length} applications</p>
+                    <div className="pager">
+                      <button type="button" disabled>
+                        Previous
+                      </button>
+                      <button type="button">Next</button>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="dashboard-secondary-grid">
+                  <article className="dashboard-panel chart-panel">
+                    <h2>Application Trends</h2>
+                    <div className="trend-chart" aria-hidden="true">
+                      {trendBars.map((bar, index) => (
+                        <div className="trend-column" key={bar.label}>
+                          <span
+                            className={`trend-bar trend-bar-${index + 1}`}
+                            style={{ height: bar.height }}
+                          />
+                          <small>{bar.label}</small>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+
+                  <article className="score-card">
+                    <div className="score-card-content">
+                      <h2>Environmental Compliance Score</h2>
+                      <p>
+                        Your organization is currently performing better than 84% of similar
+                        proponents.
+                      </p>
+                      <strong>94%</strong>
+                      <div className="score-meter" aria-hidden="true">
+                        <span />
+                      </div>
+                      <small>
+                        <InfoIcon />
+                        Based on your finalized submissions
+                      </small>
+                    </div>
+                  </article>
+                </section>
+              </>
+            ) : null}
+
+            {!workflowApplicationId && activeView === "new-app" ? (
+              <section className="space-y-6">
+                <section className="dashboard-heading">
+                  <div>
+                    <h1>New Application</h1>
+                    <p>Create an environmental clearance application for review.</p>
+                  </div>
+                </section>
+
+                <article className="dashboard-panel overflow-visible">
+                  <div className="dashboard-panel-header">
+                    <h2>Application Details</h2>
+                  </div>
+
+                  <form className="space-y-5 p-6 sm:p-8" onSubmit={handleCreateApplication}>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold uppercase tracking-[0.12em] text-[#4f6180]">
+                        Project Name
+                      </label>
+                      <input
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-[#1f2c40] outline-none transition focus:border-[#124734] focus:ring-2 focus:ring-[#124734]/15"
+                        onChange={handleFormChange("projectName")}
+                        placeholder="Enter project name"
+                        type="text"
+                        value={form.projectName}
+                      />
+                      {formErrors.projectName ? (
+                        <p className="text-sm font-medium text-rose-600">{formErrors.projectName}</p>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold uppercase tracking-[0.12em] text-[#4f6180]">
+                        Category
+                      </label>
+                      <select
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-[#1f2c40] outline-none transition focus:border-[#124734] focus:ring-2 focus:ring-[#124734]/15"
+                        onChange={handleFormChange("category")}
+                        value={form.category}
+                      >
+                        <option value="">Select sector category</option>
+                        {sectorCategories.map((sectorName) => (
+                          <option key={sectorName} value={sectorName}>
+                            {sectorName}
+                          </option>
+                        ))}
+                      </select>
+                      {formErrors.category ? (
+                        <p className="text-sm font-medium text-rose-600">{formErrors.category}</p>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold uppercase tracking-[0.12em] text-[#4f6180]">
+                        Upload Documents (PDF)
+                      </label>
+                      <label className="inline-flex items-center gap-2 text-sm font-medium text-[#4f6180]">
+                        <input
+                          checked={allowMultipleFiles}
+                          onChange={handleAllowMultipleToggle}
+                          type="checkbox"
+                        />
+                        Allow multiple PDF files
+                      </label>
+                      <input
+                        ref={fileInputRef}
+                        accept=".pdf,application/pdf"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-[#1f2c40] outline-none transition file:mr-3 file:rounded-lg file:border-0 file:bg-[#124734] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#0f3a2b] focus:border-[#124734] focus:ring-2 focus:ring-[#124734]/15"
+                        multiple={allowMultipleFiles}
+                        onChange={handleFileSelection}
+                        type="file"
+                      />
+                      {selectedFiles.length > 0 ? (
+                        <p className="text-sm text-[#4f6180]">
+                          {selectedFiles.length} file(s) selected:{" "}
+                          {selectedFiles.map((file) => file.name).join(", ")}
+                        </p>
+                      ) : null}
+                      {formErrors.documents ? (
+                        <p className="text-sm font-medium text-rose-600">{formErrors.documents}</p>
+                      ) : null}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        className="dashboard-ghost-button"
+                        onClick={handleSaveDraft}
+                        type="button"
+                      >
+                        Save as Draft
+                      </button>
+                      <button className="dashboard-primary-button" type="submit">
+                        <PlusIcon />
+                        <span>Create Application &amp; Pay</span>
+                      </button>
+                      <button
+                        className="dashboard-ghost-button"
+                        onClick={() => selectView("dashboard")}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </article>
+              </section>
+            ) : null}
+
+            {!workflowApplicationId && activeView === "my-apps" ? (
+              <section className="space-y-6">
+                <section className="dashboard-heading">
+                  <div>
+                    <h1>My Applications</h1>
+                    <p>Track every submitted project and current review status.</p>
+                  </div>
+                </section>
+
+                {creationMessage ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                    {creationMessage}
+                  </div>
+                ) : null}
+
+                <article className="dashboard-panel">
+                  <div className="dashboard-panel-header">
+                    <h2>Applications List</h2>
+                  </div>
+
+                  <ApplicationsTable
+                    applications={applications}
+                    enableWorkflowLinks
+                    onOpenWorkflow={openWorkflowWindow}
+                  />
+
+                  <div className="dashboard-panel-footer">
+                    <p>Application ID will be fetched from database after backend integration.</p>
+                    <p>Total: {applications.length}</p>
                   </div>
                 </article>
-              ))}
-            </section>
+              </section>
+            ) : null}
 
-            <section className="dashboard-panel">
-              <div className="dashboard-panel-header">
-                <h2>Recent Applications</h2>
-                <div className="dashboard-panel-actions">
-                  <button className="dashboard-ghost-button" type="button">
-                    <FilterIcon />
-                    <span>Filter</span>
-                  </button>
-                  <button className="dashboard-ghost-button" type="button">
-                    <span>Export</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="dashboard-table-wrap">
-                <table className="dashboard-table">
-                  <thead>
-                    <tr>
-                      <th>Application ID</th>
-                      <th>Project Name</th>
-                      <th>Category</th>
-                      <th>Status</th>
-                      <th>Date Submitted</th>
-                      <th className="align-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dashboardApplications.map((application) => (
-                      <tr key={application.id}>
-                        <td className="app-id">{application.id}</td>
-                        <td className="app-name">{application.name}</td>
-                        <td className="app-category">{application.category}</td>
-                        <td>
-                          <span
-                            className={`status-chip is-${slugify(
-                              application.status,
-                            )}`}
-                          >
-                            {application.status}
-                          </span>
-                        </td>
-                        <td className="app-category">{application.date}</td>
-                        <td className="align-right">
-                          <button className="table-action" type="button">
-                            <MoreIcon />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="dashboard-panel-footer">
-                <p>Showing 5 of 107 applications</p>
-                <div className="pager">
-                  <button type="button" disabled>
-                    Previous
-                  </button>
-                  <button type="button">Next</button>
-                </div>
-              </div>
-            </section>
-
-            <section className="dashboard-secondary-grid">
-              <article className="dashboard-panel chart-panel">
-                <h2>Application Trends</h2>
-                <div className="trend-chart" aria-hidden="true">
-                  {trendBars.map((bar, index) => (
-                    <div className="trend-column" key={bar.label}>
-                      <span
-                        className={`trend-bar trend-bar-${index + 1}`}
-                        style={{ height: bar.height }}
-                      />
-                      <small>{bar.label}</small>
-                    </div>
-                  ))}
-                </div>
-              </article>
-
-              <article className="score-card">
-                <div className="score-card-content">
-                  <h2>Environmental Compliance Score</h2>
-                  <p>
-                    Your organization is currently performing better than 84% of
-                    similar proponents.
-                  </p>
-                  <strong>94%</strong>
-                  <div className="score-meter" aria-hidden="true">
-                    <span />
+            {!workflowApplicationId &&
+            (activeView === "payments" || activeView === "tracking") ? (
+              <section className="space-y-6">
+                <section className="dashboard-heading">
+                  <div>
+                    <h1>{activeView === "payments" ? "Payments" : "Tracking"}</h1>
+                    <p>This section is reserved and can be connected to backend workflows next.</p>
                   </div>
-                  <small>
-                    <InfoIcon />
-                    Based on your finalized submissions
-                  </small>
-                </div>
-              </article>
-            </section>
+                </section>
+
+                <article className="dashboard-panel">
+                  <div className="p-6 text-base text-[#5d6f89]">
+                    Feature placeholder. Use sidebar to continue with New App or My Apps.
+                  </div>
+                </article>
+              </section>
+            ) : null}
           </div>
         </main>
       </div>
@@ -262,8 +537,246 @@ function ProponentDashboard() {
   );
 }
 
+function ApplicationsTable({
+  applications,
+  enableWorkflowLinks = false,
+  onOpenWorkflow,
+}) {
+  return (
+    <div className="dashboard-table-wrap">
+      <table className="dashboard-table">
+        <thead>
+          <tr>
+            <th>Application ID</th>
+            <th>Project Name</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Date Submitted</th>
+            <th className="align-right">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {applications.map((application) => (
+            <tr key={application.id}>
+              <td className="app-id">{application.id}</td>
+              <td className="app-name">
+                {enableWorkflowLinks ? (
+                  <button
+                    className="cursor-pointer border-0 bg-transparent p-0 text-left text-[inherit] font-[inherit] text-[#0f3f2f] underline-offset-4 hover:underline"
+                    onClick={() => onOpenWorkflow?.(application.id)}
+                    type="button"
+                  >
+                    {application.name}
+                  </button>
+                ) : (
+                  application.name
+                )}
+              </td>
+              <td className="app-category">{application.category}</td>
+              <td>
+                <span className={`status-chip is-${slugify(application.status)}`}>
+                  {application.status}
+                </span>
+              </td>
+              <td className="app-category">{application.date}</td>
+              <td className="align-right">
+                {application.status === "Finalized" ? (
+                  <details className="relative inline-block text-left">
+                    <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-[#124734] hover:bg-[#f2f8f4]">
+                      Download
+                    </summary>
+                    <div className="absolute right-0 z-10 mt-2 min-w-[190px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                      <button
+                        className="block w-full rounded-md px-3 py-2 text-left text-sm text-[#1f3048] hover:bg-slate-50"
+                        onClick={() => exportApplicationRecord(application, "word")}
+                        type="button"
+                      >
+                        Export as Word
+                      </button>
+                      <button
+                        className="block w-full rounded-md px-3 py-2 text-left text-sm text-[#1f3048] hover:bg-slate-50"
+                        onClick={() => exportApplicationRecord(application, "pdf")}
+                        type="button"
+                      >
+                        Export as PDF
+                      </button>
+                    </div>
+                  </details>
+                ) : null}
+
+                {application.status === "Deficiency" ? (
+                  <span
+                    className="inline-block max-w-[320px] rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-left text-sm font-medium text-rose-700"
+                    title={application.deficiencyMessage || "Deficiency raised by scrutiny team."}
+                  >
+                    {application.deficiencyMessage || "Deficiency raised by scrutiny team."}
+                  </span>
+                ) : null}
+
+                {application.status !== "Finalized" && application.status !== "Deficiency" ? (
+                  <button className="table-action" title="More actions" type="button">
+                    <MoreIcon />
+                  </button>
+                ) : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function WorkflowStagesView({ application, onClose }) {
+  const stages = [
+    "Draft",
+    "Submitted",
+    "Under Scrutiny",
+    "Deficiency Raised",
+    "Referred",
+    "MoM Generated",
+    "Finalized",
+  ];
+
+  if (!application) {
+    return (
+      <section className="space-y-4">
+        <section className="dashboard-heading">
+          <div>
+            <h1>Workflow Status</h1>
+            <p>Application not found. Please go back and try again.</p>
+          </div>
+        </section>
+        <button className="dashboard-ghost-button" onClick={onClose} type="button">
+          Back to Dashboard
+        </button>
+      </section>
+    );
+  }
+
+  const currentStageIndex = getWorkflowStageIndex(application.status);
+
+  return (
+    <section className="space-y-6">
+      <section className="dashboard-heading">
+        <div>
+          <h1>{application.name}</h1>
+          <p>
+            Workflow stages for application ID {application.id}
+          </p>
+        </div>
+      </section>
+
+      <article className="dashboard-panel overflow-visible p-6 sm:p-8">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-3xl font-semibold text-[#13243d]">Status / Workflow Stages</h2>
+          <button className="dashboard-ghost-button" onClick={onClose} type="button">
+            Close
+          </button>
+        </div>
+
+        <div className="overflow-x-auto pb-2">
+          <div className="flex min-w-[1040px] items-center gap-0">
+            {stages.map((stage, index) => {
+              const isCompleted = index <= currentStageIndex;
+              const isCurrent = index === currentStageIndex;
+              return (
+                <div className="flex flex-1 items-center" key={stage}>
+                  <div className="flex min-w-[130px] flex-col items-center gap-2 px-2 text-center">
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-bold ${
+                        isCompleted
+                          ? "border-[#124734] bg-[#124734] text-white"
+                          : "border-slate-300 bg-white text-slate-500"
+                      }`}
+                    >
+                      {index + 1}
+                    </div>
+                    <span
+                      className={`text-xs font-semibold uppercase tracking-[0.08em] ${
+                        isCurrent
+                          ? "text-[#124734]"
+                          : isCompleted
+                            ? "text-[#2e4665]"
+                            : "text-slate-400"
+                      }`}
+                    >
+                      {stage}
+                    </span>
+                  </div>
+                  {index < stages.length - 1 ? (
+                    <div
+                      className={`h-1 flex-1 rounded ${
+                        index < currentStageIndex ? "bg-[#124734]" : "bg-slate-200"
+                      }`}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </article>
+    </section>
+  );
+}
+
+function formatCount(value) {
+  return String(value).padStart(2, "0");
+}
+
+function exportApplicationRecord(application, format) {
+  const fileName =
+    `${application.id}-${format === "word" ? "application.doc" : "application.pdf"}`.replace(
+      /\s+/g,
+      "_",
+    );
+  const content = [
+    `Application ID: ${application.id}`,
+    `Project Name: ${application.name}`,
+    `Category: ${application.category}`,
+    `Status: ${application.status}`,
+    `Date Submitted: ${application.date}`,
+  ].join("\n");
+
+  const mimeType = format === "word" ? "application/msword" : "application/pdf";
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+function toDisplayDate(value) {
+  return value.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function isPdfFile(file) {
+  const name = file?.name?.toLowerCase() ?? "";
+  return file?.type === "application/pdf" || name.endsWith(".pdf");
+}
+
 function slugify(value) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+function getWorkflowStageIndex(status) {
+  if (status === "Draft") return 0;
+  if (status === "Submitted") return 1;
+  if (status === "Under Review") return 2;
+  if (status === "Deficiency") return 3;
+  if (status === "Referred") return 4;
+  if (status === "MoM Generated") return 5;
+  if (status === "Finalized") return 6;
+  return 0;
 }
 
 function LeafMark() {

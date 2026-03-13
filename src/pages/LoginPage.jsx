@@ -52,6 +52,21 @@ function LoginPage() {
       return;
     }
 
+    if (form.username === "user" && form.password === "user") {
+      navigate("/proponent-dashboard");
+      return;
+    }
+
+    if (form.username === "scrutiny" && form.password === "scrutiny") {
+      navigate("/scrutiny-dashboard");
+      return;
+    }
+
+    if (form.username === "mom" && form.password === "mom") {
+      navigate("/mom-dashboard");
+      return;
+    }
+
     setErrors({
       username: "Invalid username or password.",
       password: "Invalid username or password.",
