@@ -1054,7 +1054,6 @@ function ProponentDashboard() {
                     <h1>Dashboard</h1>
                     <p>Welcome back. Monitoring your environmental compliance status.</p>
                   </div>
-                  <span>Last updated: Oct 24, 2023 at 09:42 AM</span>
                 </section>
 
                 <section className="dashboard-stats" aria-label="Application stats">
