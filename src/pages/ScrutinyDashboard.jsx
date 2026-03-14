@@ -19,6 +19,8 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabaseClient";
 
 const APPLICATION_DOCUMENT_BUCKET = "application-documents";
+const LOCAL_AI_BACKEND_URL =
+  import.meta.env.VITE_AI_BACKEND_URL || "http://localhost:8787";
 
 const sidebarItems = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, route: "/scrutiny-dashboard" },
@@ -45,12 +47,14 @@ const sidebarItems = [
 function ScrutinyDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [cases, setCases] = useState([]);
   const [casesLoading, setCasesLoading] = useState(true);
   const [casesError, setCasesError] = useState("");
   const [isUpdatingCase, setIsUpdatingCase] = useState(false);
   const [reviewNote, setReviewNote] = useState("");
+  const [approvalProgressMessage, setApprovalProgressMessage] = useState("");
+  const [approvalErrorMessage, setApprovalErrorMessage] = useState("");
 
   const currentView = useMemo(() => getViewFromPath(location.pathname), [location.pathname]);
 
@@ -216,32 +220,62 @@ function ScrutinyDashboard() {
     const currentCase = cases.find((item) => item.id === caseId);
     if (!currentCase?.dbId) return;
 
+    setApprovalErrorMessage("");
+    setApprovalProgressMessage("Extracting PDFs and preparing AI gist...");
     setIsUpdatingCase(true);
 
-    const { error } = await supabase
-      .from("applications")
-      .update({
-        status: "referred",
-        deficiency_message: null,
-      })
-      .eq("id", currentCase.dbId);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 60_000);
 
-    if (error) {
-      setCasesError(error.message || "Failed to approve application.");
+    try {
+      const response = await fetch(
+        `${LOCAL_AI_BACKEND_URL}/api/scrutiny/approve-and-generate-gist`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            applicationId: currentCase.dbId,
+            reviewNote: reviewNote.trim(),
+            scrutinyUserId: user?.id ?? null,
+          }),
+        },
+      );
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.ok) {
+        throw new Error(
+          payload?.error ||
+            "Failed to generate AI gist. Application was not referred.",
+        );
+      }
+
+      setApprovalProgressMessage("Saving gist and updating workflow...");
+      await loadScrutinyCases();
       setIsUpdatingCase(false);
-      return;
+      setReviewNote("");
+      setApprovalProgressMessage("");
+      navigate("/scrutiny-dashboard/referred-cases");
+    } catch (error) {
+      const message =
+        error?.name === "AbortError"
+          ? "AI generation timed out. Please try again."
+          : error?.message || "Failed to approve application.";
+      setApprovalErrorMessage(message);
+      setIsUpdatingCase(false);
+      setApprovalProgressMessage("");
+    } finally {
+      window.clearTimeout(timeout);
     }
-
-    await loadScrutinyCases();
-    setIsUpdatingCase(false);
-    setReviewNote("");
-    navigate("/scrutiny-dashboard/referred-cases");
   };
 
   const raiseDeficiency = async (caseId) => {
     const currentCase = cases.find((item) => item.id === caseId);
     if (!currentCase?.dbId) return;
 
+    setApprovalProgressMessage("");
+    setApprovalErrorMessage("");
     setIsUpdatingCase(true);
 
     const { error } = await supabase
@@ -429,6 +463,8 @@ function ScrutinyDashboard() {
 
             {!casesLoading && currentView.type === "review" ? (
               <ReviewPage
+                approvalErrorMessage={approvalErrorMessage}
+                approvalProgressMessage={approvalProgressMessage}
                 caseItem={selectedCase}
                 isUpdatingCase={isUpdatingCase}
                 onApprove={approveCase}
@@ -619,6 +655,8 @@ function CasesTable({ cases, onReview, showAction = true }) {
 }
 
 function ReviewPage({
+  approvalErrorMessage,
+  approvalProgressMessage,
   caseItem,
   onBack,
   onDownload,
@@ -747,6 +785,17 @@ function ReviewPage({
               {isUpdatingCase ? "Updating..." : "Raise Deficiency"}
             </button>
           </div>
+
+          {approvalProgressMessage ? (
+            <p className="mt-3 text-[17px] font-medium text-[#2e5f49]">
+              {approvalProgressMessage}
+            </p>
+          ) : null}
+          {approvalErrorMessage ? (
+            <p className="mt-2 text-[17px] font-medium text-rose-700">
+              {approvalErrorMessage}
+            </p>
+          ) : null}
         </article>
       </div>
     </section>
